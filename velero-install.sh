@@ -86,12 +86,12 @@ Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n velero' to view 
 
 
 # Create project backup
-oc new-project test-backup
-for i in {1..20}; do echo Creating ConfigMap $i; oc create configmap cm-$i --from-literal="key=$i"; done
+oc new-project test-velero
+for i in $(seq 1 10); do oc create configmap cm-$i --from-literal="key=$i"; done
 oc get configmap
 
 # Backup Openshift
-$ velero backup create my-backup --include-namespaces test-backup
+$ velero backup create my-backup --include-namespaces test-velero
 Backup request "my-backup" submitted successfully.
 Run `velero backup describe my-backup` or `velero backup logs my-backup` for more details.
 

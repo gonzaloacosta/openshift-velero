@@ -82,22 +82,19 @@ oc patch ds/restic \
 
 
 # Create project backup
-oc project backup-test
-for i in {1..20}; do echo Creating ConfigMap $i; oc create configmap cm-$i --from-literal="key=$i"; done
+oc project test-velero
+for i in {1..20}; do oc create configmap cm-$i --from-literal="key=$i"; done
 oc get configmap
 
 # Backup Openshift
-velero backup create backup-test-20200816 --include-namespaces backup-test
-velero backup create wordpress-dev-20200816 --include-namespaces workdpress-dev
+velero backup create test-velero-20200816 --include-namespaces test-velero
 
 # Backup con snapshots de discos (solo aws)
-velero backup create backup-full-backup-test-snp-pvc --include-namespaces backup-test --snapshot-volumes=true
+velero backup create backup-full-test-velero-snp-pvc --include-namespaces test-velero --snapshot-volumes=true
 
 # Detalle de backup
-velero backup describe backup-test
-velero backup logs backup-test
-velero backup describe wordpress-dev\
-velero backup logs wordpress-dev
+velero backup describe test-velero
+velero backup logs test-velero
 
 # Simulamos eliminar configmaps
 oc delete configmap cm-{1..10}
@@ -131,22 +128,6 @@ velero install --use-restic
 
 # Asignamos permisos privilegiados
 oc adm policy add-scc-to-user privileged -z velero -n velero
-
-# Modificamos daemonsets para que corra como privilegiado
-
-oc patch ds/restic \
-  --namespace velero \
-  --type json \
-  -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
-
-# Si queremos setear los deploys de velero y daemonsets en unos nodos puntuales
-oc annotate namespace <velero namespace> openshift.io/node-selector=""
-
-
-oc get ds restic -o yaml -n <velero namespace> > ds.yaml
-oc annotate namespace <velero namespace> openshift.io/node-selector=""
-oc create -n <velero namespace> -f ds.yaml
-
 
 # Configuración de repository de resti
 https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html

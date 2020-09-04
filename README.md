@@ -182,22 +182,22 @@ oc annotate namespace <velero namespace> openshift.io/node-selector=""
 Primero creamos un proyecto de ejemplo con solo configmaps para testear el funcionamiento de manera rápida.
 
 ```
-oc new-project backup-test-1
-for i in {1..10}; do echo Crear ConfigMaps $i; oc create configmap cm-$i --from-literal="key=$i"; done
+oc new-project backup-velero-test-1
+for i in $(seq 1 10); do oc create configmap cm-$i --from-literal="key=$i"; done
 oc get configmap
 ```
 
 Segundo vamos a desplegar una aplicación complenta desde template.
 
 ```
-oc new-project backup-test-2
+oc new-project test-velero-1
 oc new-app django-psql-example
 ```
 
 Segundo vamos a desplegar una aplicación complenta desde template.
 
 ```
-oc new-project backup-test-3
+oc new-project test-velero-2
 oc new-app django-psql-persistent
 ```
 
@@ -207,14 +207,14 @@ Para realizar el backup con Velero solamente ejecutamos los siguientes comandos.
 
 ```bash
 BKP_DATE=$(date +'%Y%m%d-%H%M%S')
-velero backup create backup-test-1-$BKP_DATE --include-namespaces backup-test-1
-velero backup create backup-test-2-$BKP_DATE --include-namespaces backup-test-2
+velero backup create test-velero-1-$BKP_DATE --include-namespaces test-velero-1
+velero backup create test-velero-2-$BKP_DATE --include-namespaces test-velero-2
 ```
 
 Para el caso de backups con AWS y usando snapshots
 
 ```
-velero backup create backup-test-3-$BKP_DATE --include-namespaces backup-test-3 --snapshot-volumes=true
+velero backup create test-velero-3-$BKP_DATE --include-namespaces test-velero-3 --snapshot-volumes=true
 ```
 
 ### 9. Detalle de los backups
@@ -224,21 +224,21 @@ Si queremos ver los logs o el detalle de ejecutación
 ```
 $ velero backup get
 NAME                            STATUS      ERRORS   WARNINGS   CREATED                         EXPIRES   STORAGE LOCATION   SELECTOR
-backup-test-1-20200904-183749   Completed   0        0          2020-09-04 18:37:51 +0000 UTC   29d       default            <none>
-backup-test-2-20200904-183749   Completed   0        0          2020-09-04 18:38:09 +0000 UTC   29d       default            <none>
+test-velero-1-20200904-183749   Completed   0        0          2020-09-04 18:37:51 +0000 UTC   29d       default            <none>
+test-velero-2-20200904-183749   Completed   0        0          2020-09-04 18:38:09 +0000 UTC   29d       default            <none>
 ```
 
 ```
-velero backup describe backup-test-1-$BKP_DATE
-velero backup logs backup-test-2-$BKP_DATE
+velero backup describe test-velero-1-$BKP_DATE
+velero backup logs test-velero-2-$BKP_DATE
 ```
 
 ### 10. Simulamos un eleminación de datos.
 
-Borramos los configmaps del proyecto backup-test-1
+Borramos los configmaps del proyecto test-velero-1
 
 ```
-$ oc delete cm --all -n backup-test-1
+$ oc delete cm --all -n test-velero-1
 configmap "cm-1" deleted
 configmap "cm-10" deleted
 configmap "cm-2" deleted
@@ -249,8 +249,8 @@ configmap "cm-6" deleted
 configmap "cm-7" deleted
 configmap "cm-8" deleted
 configmap "cm-9" deleted
-$ oc get cm -n backup-test-1
-No resources found in backup-test-1 namespace.
+$ oc get cm -n test-velero-1
+No resources found in test-velero-1 namespace.
 ```
 
 ### 11. Restore con Velero
@@ -258,15 +258,15 @@ No resources found in backup-test-1 namespace.
 1. Restore con velero de objetos de Kubernetes
 
 ```
-$ velero restore create --from-backup backup-test-1-$BKP_DATE
-Restore request "backup-test-1-20200904-183749-20200904184145" submitted successfully.
-Run `velero restore describe backup-test-1-20200904-183749-20200904184145` or `velero restore logs backup-test-1-20200904-183749-20200904184145` for more details.
+$ velero restore create --from-backup test-velero-1-$BKP_DATE
+Restore request "test-velero-1-20200904-183749-20200904184145" submitted successfully.
+Run `velero restore describe test-velero-1-20200904-183749-20200904184145` or `velero restore logs test-velero-1-20200904-183749-20200904184145` for more details.
 ```
 
 Revisamos configmaps
 
 ```
-$ oc get cm -n backup-test-1
+$ oc get cm -n test-velero-1
 NAME    DATA   AGE
 cm-1    1      18s
 cm-10   1      18s
@@ -285,34 +285,34 @@ cm-9    1      18s
 Borramos el proyecto completo
 
 ```
-$ oc get pods -n backup-test-2
+$ oc get pods -n test-velero-2
 NAME                           READY   STATUS      RESTARTS   AGE
 django-psql-example-1-build    0/1     Completed   0          9m49s
 django-psql-example-1-ckdwk    1/1     Running     0          7m46s
 django-psql-example-1-deploy   0/1     Completed   0          7m49s
 postgresql-1-deploy            0/1     Completed   0          9m49s
 postgresql-1-gll9s             1/1     Running     0          9m47s
-$ oc delete project backup-test-2
-project.project.openshift.io "backup-test-2" deleted
+$ oc delete project test-velero-2
+project.project.openshift.io "test-velero-2" deleted
 $
 ```
 
 Hacemos el restore completo.
 
 ```
-velero restore create --from-backup backup-test-2-$BKP_DATE
+velero restore create --from-backup test-velero-2-$BKP_DATE
 ```
 
 ```
-$ velero restore describe backup-test-2-20200904-183749-20200904184316
-Name:         backup-test-2-20200904-183749-20200904184316
+$ velero restore describe test-velero-2-20200904-183749-20200904184316
+Name:         test-velero-2-20200904-183749-20200904184316
 Namespace:    velero
 Labels:       <none>
 Annotations:  <none>
 
 Phase:  Completed
 
-Backup:  backup-test-2-20200904-183749
+Backup:  test-velero-2-20200904-183749
 
 Namespaces:
   Included:  all namespaces found in the backup
@@ -328,7 +328,7 @@ Namespace mappings:  <none>
 Label selector:  <none>
 
 Restore PVs:  auto
-$ oc get pods -n backup-test-2
+$ oc get pods -n test-velero-2
 NAME                          READY   STATUS    RESTARTS   AGE
 django-psql-example-1-build   1/1     Running   0          31s
 django-psql-example-1-ckdwk   1/1     Running   0          64s
