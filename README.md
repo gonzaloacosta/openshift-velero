@@ -2,6 +2,8 @@
 
 ## ¿Que es velero?
 
+<img src="images/velero.png" alt="velero" title="Velero" width="720" eight="400" />
+
 Velero es una herramienta open source para realizar backups y restore, disaster recovery y migración de recursos de kuberntes y persisten volumes.
 
 Para el backup de configuración y teniendo una cantidad baja de proyectos, siendo una cantidad baja menos de 100, un backup de storage como MinIO esta bien pero si queremos realizar backups de volumenes persistenes (PV) tenemos que pensar bien las opciones.
