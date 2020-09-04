@@ -32,15 +32,6 @@ El rol del host bastión es poder ejecutar los comandos de instalación de veler
 Para el funcionamiento de velero es neceario tener el cliente oc correctamente funcionando y con permisos para poder desplegar aplicaciones.
 Asumimos que el cliente oc esta instalado en el host bastión
 
-### 0. Velero CLI
-
-* [Download Velero CLI](https://github.com/vmware-tanzu/velero/releases/download/v1.4.2/velero-v1.4.2-linux-amd64.tar.gz)
-
-
-```shell
-wget https://github.com/vmware-tanzu/velero/releases/download/v1.4.2/velero-v1.4.2-linux-amd64.tar.gz
-```
-
 ### 1. Clonar repositorio
 
 ```
@@ -53,21 +44,21 @@ cd velero
 Configurar el directorio donde vamos a alojar la información de los s3.
 
 ```
-sudo mkdir /minio
-sudo chmod 755 /minio
+sudo mkdir /minio/{data,config}
+sudo chmod 755 -R /minio
 ```
 
-Configuramos el firewall local. El puerto de exposición puede ser el 9000, 9001 o cualquier que se desee por solapamiento en mi host coloqué el 9001.
+Configuramos el firewall local. 
 
 ```
 sudo firewall-cmd --get-active-zones
-sudo firewall-cmd --zone=public --add-port=9001/tcp --permanent
+sudo firewall-cmd --zone=public --add-port=9000/tcp --permanent
 ```
 
 Levantar minio como contanedore en podman
 
 ```
-sudo podman run --name minio -p 9001:9000 \
+sudo podman run --name minio -p 9000:9000 \
   -v /minio/data:/data:z \
   -v /minio/config:/root/.minio:z \
   -e "MINIO_ACCESS_KEY=MINIOKEYMINIO" \
@@ -87,13 +78,14 @@ Bastion Hostname: minio.mask.io
 ```
 wget https://dl.min.io/client/mc/release/linux-amd64/mc
 chmod +x mc
-./mc --help
+sudo cp mc /usr/local/bin/
+mc --help
 ```
 
 Configuramos el bucket de velero
 
 ```
-mc alias set minio http://192.168.3.2:9001 MINIOKEYMINIO MINIOSECRETKEYMINIO
+mc alias set minio http://minio.mask.io:9000 MINIOKEYMINIO MINIOSECRETKEYMINIO
 mc alias ls
 mc mb minio/velero
 ```
@@ -101,7 +93,6 @@ mc mb minio/velero
 ### 4. Instalación de Velero
 
 ```
-# Install Velero CLI
 wget https://github.com/vmware-tanzu/velero/releases/download/v1.4.2/velero-v1.4.2-linux-amd64.tar.gz
 tar xvzf velero-v1.4.2-linux-amd64.tar.gz
 sudo mv velero-v1.4.2-linux-amd64/velero /usr/local/bin/
@@ -135,7 +126,7 @@ velero install \
     --bucket velero \
     --secret-file ./credentials-velero \
     --use-volume-snapshots=false \
-    --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://192.168.3.2:9001
+    --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.mask.io:9000
 ```
 
 * Sin restic y con snapshots de volumenes.
@@ -147,7 +138,7 @@ velero install \
     --bucket velero \
     --secret-file ./credentials-velero \
     --use-volume-snapshots=true \
-    --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://192.168.3.2:9001
+    --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.mask.io:9000
 ```
 
 * Con restic y sin snapshots
@@ -161,7 +152,7 @@ velero install \
     --use-volume-snapshots=false \
     --use-restic \
     --default-volumes-to-restic \
-    --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://192.168.3.2:9001
+    --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.mask.io:9000
 ```
 
 *NOTA!!! Nota en caso de usar `restic`, hay que dar al service account permisos privilegiados para que funcione.* 
@@ -191,7 +182,7 @@ oc annotate namespace <velero namespace> openshift.io/node-selector=""
 Primero creamos un proyecto de ejemplo con solo configmaps para testear el funcionamiento de manera rápida.
 
 ```
-oc project backup-test-1
+oc new-project backup-test-1
 for i in {1..10}; do echo Crear ConfigMaps $i; oc create configmap cm-$i --from-literal="key=$i"; done
 oc get configmap
 ```
@@ -199,14 +190,14 @@ oc get configmap
 Segundo vamos a desplegar una aplicación complenta desde template.
 
 ```
-oc project backup-test-2
+oc new-project backup-test-2
 oc new-app django-psql-example
 ```
 
 Segundo vamos a desplegar una aplicación complenta desde template.
 
 ```
-oc project backup-test-3
+oc new-project backup-test-3
 oc new-app django-psql-persistent
 ```
 
@@ -215,7 +206,7 @@ oc new-app django-psql-persistent
 Para realizar el backup con Velero solamente ejecutamos los siguientes comandos.
 
 ```bash
-BKP_DATE=$(date +'%Y-%m-%d-%H:%M:%S')
+BKP_DATE=$(date +'%Y%m%d-%H%M%S')
 velero backup create backup-test-1-$BKP_DATE --include-namespaces backup-test-1
 velero backup create backup-test-2-$BKP_DATE --include-namespaces backup-test-2
 ```
@@ -231,8 +222,15 @@ velero backup create backup-test-3-$BKP_DATE --include-namespaces backup-test-3 
 Si queremos ver los logs o el detalle de ejecutación
 
 ```
-velero backup describe backup-test-1
-velero backup logs backup-test-1
+$ velero backup get
+NAME                            STATUS      ERRORS   WARNINGS   CREATED                         EXPIRES   STORAGE LOCATION   SELECTOR
+backup-test-1-20200904-183749   Completed   0        0          2020-09-04 18:37:51 +0000 UTC   29d       default            <none>
+backup-test-2-20200904-183749   Completed   0        0          2020-09-04 18:38:09 +0000 UTC   29d       default            <none>
+```
+
+```
+velero backup describe backup-test-1-$BKP_DATE
+velero backup logs backup-test-2-$BKP_DATE
 ```
 
 ### 10. Simulamos un eleminación de datos.
@@ -240,7 +238,19 @@ velero backup logs backup-test-1
 Borramos los configmaps del proyecto backup-test-1
 
 ```
-oc delete configmap cm-{1..5}
+$ oc delete cm --all -n backup-test-1
+configmap "cm-1" deleted
+configmap "cm-10" deleted
+configmap "cm-2" deleted
+configmap "cm-3" deleted
+configmap "cm-4" deleted
+configmap "cm-5" deleted
+configmap "cm-6" deleted
+configmap "cm-7" deleted
+configmap "cm-8" deleted
+configmap "cm-9" deleted
+$ oc get cm -n backup-test-1
+No resources found in backup-test-1 namespace.
 ```
 
 ### 11. Restore con Velero
@@ -248,13 +258,26 @@ oc delete configmap cm-{1..5}
 1. Restore con velero de objetos de Kubernetes
 
 ```
-velero restore create --from-backup backup-test-1-$BKP_DATE
+$ velero restore create --from-backup backup-test-1-$BKP_DATE
+Restore request "backup-test-1-20200904-183749-20200904184145" submitted successfully.
+Run `velero restore describe backup-test-1-20200904-183749-20200904184145` or `velero restore logs backup-test-1-20200904-183749-20200904184145` for more details.
 ```
 
 Revisamos configmaps
 
 ```
-oc get cm -n backup-test-1
+$ oc get cm -n backup-test-1
+NAME    DATA   AGE
+cm-1    1      18s
+cm-10   1      18s
+cm-2    1      18s
+cm-3    1      18s
+cm-4    1      18s
+cm-5    1      18s
+cm-6    1      18s
+cm-7    1      18s
+cm-8    1      18s
+cm-9    1      18s
 ```
 
 2. Restore con velero de un proyecto completo.
@@ -262,13 +285,55 @@ oc get cm -n backup-test-1
 Borramos el proyecto completo
 
 ```
-oc delete project backup-test-2
+$ oc get pods -n backup-test-2
+NAME                           READY   STATUS      RESTARTS   AGE
+django-psql-example-1-build    0/1     Completed   0          9m49s
+django-psql-example-1-ckdwk    1/1     Running     0          7m46s
+django-psql-example-1-deploy   0/1     Completed   0          7m49s
+postgresql-1-deploy            0/1     Completed   0          9m49s
+postgresql-1-gll9s             1/1     Running     0          9m47s
+$ oc delete project backup-test-2
+project.project.openshift.io "backup-test-2" deleted
+$
 ```
 
 Hacemos el restore completo.
 
 ```
 velero restore create --from-backup backup-test-2-$BKP_DATE
+```
+
+```
+$ velero restore describe backup-test-2-20200904-183749-20200904184316
+Name:         backup-test-2-20200904-183749-20200904184316
+Namespace:    velero
+Labels:       <none>
+Annotations:  <none>
+
+Phase:  Completed
+
+Backup:  backup-test-2-20200904-183749
+
+Namespaces:
+  Included:  all namespaces found in the backup
+  Excluded:  <none>
+
+Resources:
+  Included:        *
+  Excluded:        nodes, events, events.events.k8s.io, backups.velero.io, restores.velero.io, resticrepositories.velero.io
+  Cluster-scoped:  auto
+
+Namespace mappings:  <none>
+
+Label selector:  <none>
+
+Restore PVs:  auto
+$ oc get pods -n backup-test-2
+NAME                          READY   STATUS    RESTARTS   AGE
+django-psql-example-1-build   1/1     Running   0          31s
+django-psql-example-1-ckdwk   1/1     Running   0          64s
+postgresql-1-gll9s            1/1     Running   0          64s
+$
 ```
 
 ### 12. Conclusiones y pasos a seguir.
