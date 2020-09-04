@@ -170,6 +170,22 @@ velero install \
 oc adm policy add-scc-to-user privileged -z velero -n velero
 ```
 
+Para el caso de `restic` hay que hacer el patch del daemonset (ds) para OCP u OKD mayor a 4.1
+
+```
+# Patch ds para okd u ocp mayor 4.1
+oc patch ds/restic \
+  --namespace velero \
+  --type json \
+  -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
+```
+
+En caso de que se desee que los pods de velero y restic corran en nodos dedicados podemos agregar el selector de nodo al namespace.
+
+```
+oc annotate namespace <velero namespace> openshift.io/node-selector=""
+```
+
 ### 7. Test de aplicaciones
 
 Primero creamos un proyecto de ejemplo con solo configmaps para testear el funcionamiento de manera rápida.
@@ -271,7 +287,10 @@ Los procedimientos son los mismos pero en este caso en formato shell scripts no 
 * [Instalación en Openshift con MinIO en Openshift](velero-install.sh)
 * [Instalación en Openshfit con MinIO en host Bastión](velero-install.sh)
 
-
 ## Links 
-* https://velero.io/docs/v1.4/basic-install/
 
+* [Velero.io](https://velero.io/docs/v1.4/basic-install/)
+* [vsphere "Cloud Native Storage for vSphere", este plugins es necesario con vSAN para poder crear snapshots de volumenes.](https://blogs.vmware.com/virtualblocks/2019/08/14/introducing-cloud-native-storage-for-vsphere/)
+* [Backup and Migrate TKGI (PKS) to TKG with Velero](https://beyondelastic.com/2020/04/30/backup-and-migrate-tkgi-pks-to-tkg-with-velero/)
+* [Velero Plugin for vSphere](https://github.com/vmware-tanzu/velero-plugin-for-vsphere#installing-the-plugin)
+* [Restic Integration](https://velero.io/docs/main/restic/)
