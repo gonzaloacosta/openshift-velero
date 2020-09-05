@@ -1,4 +1,4 @@
-# Como instalar Velero en Openshift AWS
+# Como instalar Velero en Openshift
 
 ## ¿Que es velero?
 
