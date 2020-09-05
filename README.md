@@ -153,7 +153,6 @@ velero install \
     --secret-file ./credentials-velero \
     --use-volume-snapshots=false \
     --use-restic \
-    --default-volumes-to-restic \
     --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.mask.io:9000
 ```
 
@@ -184,7 +183,7 @@ oc annotate namespace <velero namespace> openshift.io/node-selector=""
 Primero creamos un proyecto de ejemplo con solo configmaps para testear el funcionamiento de manera rápida.
 
 ```
-oc new-project backup-velero-test-1
+oc new-project test-velero-1
 for i in $(seq 1 10); do oc create configmap cm-$i --from-literal="key=$i"; done
 oc get configmap
 ```
@@ -192,31 +191,34 @@ oc get configmap
 Segundo vamos a desplegar una aplicación complenta desde template.
 
 ```
-oc new-project test-velero-1
+oc new-project test-velero-2
 oc new-app django-psql-example
 ```
 
 Segundo vamos a desplegar una aplicación complenta desde template.
 
 ```
-oc new-project test-velero-2
+oc new-project test-velero-3
 oc new-app django-psql-persistent
 ```
 
 ### 8. Backup con Velero
 
-Para realizar el backup con Velero solamente ejecutamos los siguientes comandos.
+Para realizar el backup con Velero solamente ejecutamos los siguientes comandos. 
+
+NOTA: En ambientes de multiple cluster donde tenemos un solo repositorio de velero es importante llamar a los backups por el nombre correcto.
 
 ```bash
 BKP_DATE=$(date +'%Y%m%d-%H%M%S')
-velero backup create test-velero-1-$BKP_DATE --include-namespaces test-velero-1
-velero backup create test-velero-2-$BKP_DATE --include-namespaces test-velero-2
+velero backup create aws-test-velero-1-$BKP_DATE --include-namespaces test-velero-1
+velero backup create aws-test-velero-2-$BKP_DATE --include-namespaces test-velero-2
 ```
 
 Para el caso de backups con AWS y usando snapshots
 
 ```
-velero backup create test-velero-3-$BKP_DATE --include-namespaces test-velero-3 --snapshot-volumes=true
+NAMESPACE=test-velero-3
+velero backup create $CLUSTERID-$NAMESPACE-$BKP_DATE --include-namespaces $NAMESPACE --snapshot-volumes=true
 ```
 
 ### 9. Detalle de los backups
@@ -338,7 +340,66 @@ postgresql-1-gll9s            1/1     Running   0          64s
 $
 ```
 
-### 12. Conclusiones y pasos a seguir.
+### 12. Backup AWS y Restore On-Premise
+
+En caso de querer hacer un backup en la nube y un restore en On Premise es super simple, tenemos dos alternativas.
+
+1. Backup minio en nube y minio on premise
+
+Para esto debemos copiar el backup de un s3 a otro s3 con minio hacemos lo siguiente, en el minio onpremise configurar el alias del minio de la nube.
+
+```
+$ mc alias ls | grep minio -A5 
+minio
+  URL       : http://minio.ocp4.labs.semperti.local:9000
+  AccessKey : MINIOKEYMINIO
+  SecretKey : MINIOSECRETKEYMINIO
+  API       : s3v4
+  Path      : auto
+
+minio-aws
+  URL       : http://minio-velero.apps.cluster-deb5.deb5.sandbox456.opentlc.com
+  AccessKey : minio
+  SecretKey : minio123
+  API       : s3v4
+  Path      : auto
+```
+
+Copiamos un backup de la nube a on-premise, donde `aws-test-velero-2-20200905-131513` es el nombre del backup en el s3 de la nube.
+
+```
+mc cp --recursive minio-aws/velero/backups/aws-test-velero-2-20200905-131513 minio/velero/backups/
+mc ls minio/velero/backups/
+```
+
+Realizamos el restore
+
+```
+$ oc get backups -n velero
+NAME                                AGE
+aws-test-velero-1-20200905-131513   8m13s
+aws-test-velero-2-20200905-131513   8m13s
+```
+
+```
+velero restore create --from-backup aws-test-velero-1-20200905-131513
+```
+
+Chequeamos el restore
+```
+oc get cm -n test-velero-1
+```
+
+2. Minio central para velero de la nube como para on premise
+
+En este caso los backups que tomemos en la nube se verán en el minio de on premise, siempre es necesario que coloquemos los nombres correctos para no pisarlos.
+
+```
+velero restore create --from-backup aws-test-velero-1-20200905-131513
+```
+
+
+### 13. Conclusiones y pasos a seguir.
 
 Queda por agregar varios de los test básicos que luego voy a ir agregando en pasos subsiguientes.
 
@@ -347,7 +408,7 @@ Queda por agregar varios de los test básicos que luego voy a ir agregando en pa
 
 En las commit subsiguientes vamos a extender en conceptos teóricos y prácticos.
 
-### 13. Scripts de instalación en modo Shell Scripts
+### 14. Scripts de instalación en modo Shell Scripts
 
 Los procedimientos son los mismos pero en este caso en formato shell scripts no mark down.
 

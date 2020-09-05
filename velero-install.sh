@@ -30,8 +30,8 @@ velero version
 # Velero Credentials
 cat << EOF > credentials-velero
 [default]
-aws_access_key_id = minio
-aws_secret_access_key = minio123
+aws_access_key_id = MINIOKEYMINIO
+aws_secret_access_key = MINIOSECRETKEYMINIO
 EOF
 
 # Install Velero
@@ -40,7 +40,7 @@ velero install \
     --plugins velero/velero-plugin-for-aws:v1.0.0 \
     --bucket velero \
     --secret-file ./credentials-velero \
-    --use-volume-snapshots=false \
+    --use-volume-snapshots=true \
     --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000
 
 # ----------------- OUTPUT ---------------------
