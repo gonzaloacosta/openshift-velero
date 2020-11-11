@@ -8,11 +8,11 @@ Velero es una herramienta open source para realizar backups y restore, disaster 
 
 Velero utiliza un backend de storage object para poder alojar los backups como S3, GCS o MinIO. En nuestro caso para esta demo utilizaremos MinIO que nos brinda storage de objeto de tipo S3 para alojar nuestros backups de configuración. Un tema importante a tener en cuenta es la necesidad de realizar un resguardo de volumenes persistentes donde tendremos que elegir la tecnología y escalarla acorde a nuestra necesidad sea on-premise o cloud. 
 
-- Ambiente Cloud
+**- Ambiente Cloud**
 
 En ambientes cloud como AWS, Openshit o Kubernetes pueden trabajar con backend de storage provisionando EBS para persistir datos asociados a nuestros pods. En este caso Velero utiliza trabaja sobre lsnapshots de EBS para hacer los backups. Toda solución de storage cloud que permita esta funcionalidad, trabaje con k8s y este dentro de las cubiertas por velero utilizán este metodo para poder hacer backups y restores.
 
-- Ambiente On Premise
+**- Ambiente On Premise**
 
 En ambientes On Premise tenemos diversas alternativas segun el backend de storage que tengamos configurado en Openshift. Si trabajamos con vSphere y contamos con vSAN y nuestro cluster de kubernetes tiene configurado el plugin `vsphere-csi-driver`, podemos tomar snapshots de nuestros volumenes. En cambio si tenemos el plugin `vsphere-volumes` que trabaja sobre un datastore, no podremos realizar snapshopts porque no lo permite. 
 
