@@ -4,17 +4,21 @@
 
 <img src="images/velero.png" alt="velero" title="Velero" width="720" eight="400" />
 
-Velero es una herramienta open source para realizar backups y restore, disaster recovery y migración de recursos de kuberntes incluído persisten volumes. Como el sitio oficinal del proyecto lo indica:
+Con mucho de nuestros clientes abordamos estrategías de backups y restore integral sobre ambientes de contenedores como Openshift, no solo aspectos de backup y restore de la infraestructura y consideramos la infraestructura como la base de datos etcd, recreación de nodos, etc. Sino también todo lo que esté desarrollado con la aplicación sobre la plataforma de contenedores. 
 
-Velero utiliza un backend de storage object para poder alojar los backups como S3, GCS o MinIO. En nuestro caso para esta demo utilizaremos MinIO que nos brinda storage de objeto de tipo S3 para alojar nuestros backups de configuración. Un tema importante a tener en cuenta es la necesidad de realizar un resguardo de volumenes persistentes donde tendremos que elegir la tecnología y escalarla acorde a nuestra necesidad sea on-premise o cloud. 
+Velero es una herramienta open source para realizar backups y restore, disaster recovery y migración de recursos de kuberntes incluído persistent volumes. Como el sitio oficinal del proyecto lo indica:
+
+Velero utiliza un backend de storage object como S3, GCS o MinIO para poder alojar los backups. En nuestro caso para esta demo utilizaremos MinIO. Un tema importante a tener en cuenta es la necesidad de realizar un resguardo de volumenes persistentes donde tendremos que elegir la tecnología y escalarla acorde a nuestra necesidad sea on-premise o cloud. 
+
+En nuestra demo consideramos escenarios tanto On-Premise como en ambientes de nube.
 
 **- Ambiente Cloud**
 
-En ambientes cloud como AWS, Openshit o Kubernetes pueden trabajar con backend de storage provisionando EBS para persistir datos asociados a nuestros pods. En este caso Velero utiliza trabaja sobre lsnapshots de EBS para hacer los backups. Toda solución de storage cloud que permita esta funcionalidad, trabaje con k8s y este dentro de las cubiertas por velero utilizán este metodo para poder hacer backups y restores.
+En ambientes cloud como AWS, Openshit o Kubernetes pueden trabajar con backend de storage provisionando EBS para persistir datos asociados a nuestros pods. En este caso Velero utiliza trabaja sobre snapshots de EBS para hacer los backups. Toda solución de storage cloud que permita esta funcionalidad, trabaje con k8s y esté dentro de las cubiertas por velero, utilizarán este metodo para poder hacer backups y restores.
 
 **- Ambiente On Premise**
 
-En ambientes On Premise tenemos diversas alternativas segun el backend de storage que tengamos configurado en Openshift. Si trabajamos con vSphere y contamos con vSAN y nuestro cluster de kubernetes tiene configurado el plugin `vsphere-csi-driver`, podemos tomar snapshots de nuestros volumenes. En cambio si tenemos el plugin `vsphere-volumes` que trabaja sobre un datastore, no podremos realizar snapshopts porque no lo permite. 
+En ambientes On Premise tenemos diversas alternativas segun el backend de storage que tengamos configurado en Openshift. Si trabajamos con vSphere y contamos con vSAN y nuestro cluster de kubernetes tiene configurado el plugin `vsphere-csi-driver`, podemos tomar snapshots de nuestros volúmenes. En cambio si tenemos el plugin `vsphere-volumes` que trabaja sobre un datastore, no podremos realizar snapshopts porque no lo permite. 
 
 Sin snapshots, la opción que tenemos para trabajar es con `Restic`. Restic es una herramienta de backup open source que permite hacer una copia de los volumenes a un archivo y subirla a un backend de storage como MinIO/S3/GCS. La desventaja de restic para backups de volumenes de gran tamaño es que puede ser lenta al trabajar porque lo hace con un solo hilo de ejecución. Restic es habilitado al momento de la instalación por medio del argumento `--restic`.
 
@@ -29,6 +33,10 @@ La instalación de velero se realiza sobre un cluster previamente desplegado sob
 * Host Bastión (Linux)
 
 El rol del host bastión es poder ejecutar los comandos de instalación de velero y desplegar el backend de storage con MinIO como un contenedor agregando un volumen para la persistencia de datos. 
+
+Un esquema de la demo es el siguiente, donde temos un cluster de Openshfit en AWS y un cluster de Openshift On-Premise.
+
+<img src="images/topologia.png" alt="velero" title="Velero" width="720" eight="400" />
 
 ## Instalación
 
@@ -59,7 +67,7 @@ sudo firewall-cmd --get-active-zones
 sudo firewall-cmd --zone=public --add-port=9000/tcp --permanent
 ```
 
-Levantar minio como contenedor con podman
+Levantar minio como contenedor utilizando podman.
 
 ```
 sudo podman run --name minio -p 9000:9000 \
@@ -70,7 +78,7 @@ sudo podman run --name minio -p 9000:9000 \
   minio/minio server /data
 ```
 
-Datos de conexión para el bastión en mi laboratorio.
+Datos de conexión para el bastión (ej: en laboratorio propio).
 
 ```
 Bastion IP: 192.168.3.2
@@ -105,7 +113,7 @@ velero version
 
 ### 5. Credenciales de Velero
 
-Definimos las credenciales de velero para el host bastión, las password puden ser cualquiera simularían a un access key y access secrets de AWS.
+Definimos las credenciales de velero para el host bastión, las password pueden ser cualquiera y simularían a un access key y access secrets de AWS.
 
 ```bash
 cat << EOF > credentials-velero
@@ -374,7 +382,7 @@ mc cp --recursive minio-aws/velero/backups/aws-test-velero-2-20200905-131513 min
 mc ls minio/velero/backups/
 ```
 
-Realizamos el restore previamente los logueados al cluster de On-Premise, como nuestro despliegue de velero On-Premise tiene configurado el repo de MinIO y nosotros hicimos el restore sobre ese mismo bucket, vamos a ver los backup de la nube previamente copidos. Solo resta realizar el restore en el cluster porque la fuente esta en nuestro backend MinIO.
+Realizamos el restore previamente logueados al cluster On-Premise, como nuestro despliegue de velero On-Premise tiene configurado el repo de MinIO y nosotros hicimos el restore sobre ese mismo bucket, vamos a ver los backup de la nube previamente copiados. Solo resta realizar el restore en el cluster porque la fuente está en nuestro backend MinIO.
 
 ```
 $ oc get backups -n velero
@@ -403,7 +411,7 @@ velero restore create --from-backup aws-test-velero-1-20200905-131513
 
 ### 13. Conclusiones y pasos a seguir.
 
-Velero nos ofrece una opción rápida y simple para una estrategía de backup y retore nativa de Openshift/Kubernetes. Para ambientes de Cloud y/o ambientes OnPremise donde contemos backend de storage de tipo Cloud, es una excelente opcion para reforzar la estrategia de backup, restore o migración de aplicaciones. Quedan por ver para proximas entradas los puntos relacionados con: 
+Velero nos ofrece una opción rápida y simple para una estrategía de backup y retore nativa de Openshift/Kubernetes. Para ambientes de Cloud y/o ambientes OnPremise donde contemos con backend de storage de tipo Cloud, es una excelente opcion para reforzar la estrategia de backup, restore o migración de aplicaciones. Quedan por ver para proximas entradas los puntos relacionados con: 
 
 1. Backups y Restore de Persistent Volumes con Snapshots
 2. Backups y Restore de Persistent Volumes con Restic
