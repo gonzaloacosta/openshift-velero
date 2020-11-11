@@ -374,7 +374,7 @@ mc cp --recursive minio-aws/velero/backups/aws-test-velero-2-20200905-131513 min
 mc ls minio/velero/backups/
 ```
 
-Realizamos el restore en On-Premise previamente los logueamos al cluster On-Premise, como nuestro despliegue de velero On-Premise tiene configurado el repo de MinIO y nosotros hicimos el restore sobre ese mismo bucket, vamos a ver los backup de la nube previamente copidos. Solo resta realizar el restore en el cluster porque la fuente esta en nuestro backend MinIO.
+Realizamos el restore previamente los logueados al cluster de On-Premise, como nuestro despliegue de velero On-Premise tiene configurado el repo de MinIO y nosotros hicimos el restore sobre ese mismo bucket, vamos a ver los backup de la nube previamente copidos. Solo resta realizar el restore en el cluster porque la fuente esta en nuestro backend MinIO.
 
 ```
 $ oc get backups -n velero
