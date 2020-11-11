@@ -4,35 +4,37 @@
 
 <img src="images/velero.png" alt="velero" title="Velero" width="720" eight="400" />
 
-Velero es una herramienta open source para realizar backups y restore, disaster recovery y migración de recursos de kuberntes y persisten volumes.
+Velero es una herramienta open source para realizar backups y restore, disaster recovery y migración de recursos de kuberntes incluído persisten volumes. Como el sitio oficinal del proyecto lo indica:
 
-Para el backup de configuración y teniendo una cantidad baja de proyectos, siendo una cantidad baja menos de 100, un backup de storage como MinIO esta bien pero si queremos realizar backups de volumenes persistenes (PV) tenemos que pensar bien las opciones.
+Velero utiliza un backend de storage object para poder alojar los backups como S3, GCS o MinIO. En nuestro caso para esta demo utilizaremos MinIO que nos brinda storage de objeto de tipo S3 para alojar nuestros backups de configuración. Un tema importante a tener en cuenta es la necesidad de realizar un resguardo de volumenes persistentes donde tendremos que elegir la tecnología y escalarla acorde a nuestra necesidad sea on-premise o cloud. 
 
 - Ambiente Cloud
 
-Si el ambiente es de nube, como por ejemplo AWS y trabajamos con volumenes EBS el backup se realizar via Snapshots y la operatoria es fácil. Mismo sucede con otras tecnologías de cloud que permitan realizar snapshots.
+En ambientes cloud como AWS, Openshit o Kubernetes pueden trabajar con backend de storage provisionando EBS para persistir datos asociados a nuestros pods. En este caso Velero utiliza trabaja sobre lsnapshots de EBS para hacer los backups. Toda solución de storage cloud que permita esta funcionalidad, trabaje con k8s y este dentro de las cubiertas por velero utilizán este metodo para poder hacer backups y restores.
 
 - Ambiente On Premise
 
-Par el ambiente On Premise tenemos dos alternativos con snapshots o sin él. Si tenemos por ejemplo vSAN y el plugin de Kubernetes para poder trabajar con vSAN como provisionardor de volumenes persistentes y permite snapshots, la operatoria es similar que en la nube. Mismo otra tecnología on-premise que pueda trabajar con este método.
+En ambientes On Premise tenemos diversas alternativas segun el backend de storage que tengamos configurado en Openshift. Si trabajamos con vSphere y contamos con vSAN y nuestro cluster de kubernetes tiene configurado el plugin `vsphere-csi-driver`, podemos tomar snapshots de nuestros volumenes. En cambio si tenemos el plugin `vsphere-volumes` que trabaja sobre un datastore, no podremos realizar snapshopts porque no lo permite. 
 
-Sin snapshots, la opción es trabajar con con `Restic`. Restic es una herramienta de backup open source que permite hacer un copiado de los volumenes a un archivo y subirla a un backup de storage como MinIO o AWD S3. La desventaja de restic para backups de volumenes grandes es que puede ser lenta al trabajar con un solo hilo de ejecución. Restic se habilita la momento de la instalación con el argumento `--restic` al momento de instalar velero (ver mas abajo para mayor detalle).
+Sin snapshots, la opción que tenemos para trabajar es con `Restic`. Restic es una herramienta de backup open source que permite hacer una copia de los volumenes a un archivo y subirla a un backend de storage como MinIO/S3/GCS. La desventaja de restic para backups de volumenes de gran tamaño es que puede ser lenta al trabajar porque lo hace con un solo hilo de ejecución. Restic es habilitado al momento de la instalación por medio del argumento `--restic`.
 
+Como verán, el sizing debe ser acorde al objetivo que se busca, para necesidades de mayor volumen de datos a persistir el sizing de MinIO es fundamental.
 
 ## Ambiente
 
-La instalación de velero se realiza sobre un cluster previamente creado sobre cualquier infraestructurta de Cloud (Cloud u On-Premise).
+La instalación de velero se realiza sobre un cluster previamente desplegado sobre cualquier infraestructurta Cloud y/o On-Premise.
 
 * Infraestructura en AWS o vSphere.
 * Openshift 4.x sobre AWS u On-Premise
-* Host Bastión
+* Host Bastión (Linux)
 
-El rol del host bastión es poder ejecutar los comandos de instalación de velero y el deploy de la solución, en el laboratorio tambien se utiliza el host bastion para poder levantar un servicio con MinIO en un contenedor, adicionar un volumen para la persistencia de datos. MinIO trabaja como backend de storage S3 donde se alojarán los backups de Openshift de manera externa.
+El rol del host bastión es poder ejecutar los comandos de instalación de velero y desplegar el backend de storage con MinIO como un contenedor agregando un volumen para la persistencia de datos. 
 
 ## Instalación
 
-Para el funcionamiento de velero es neceario tener el cliente oc correctamente funcionando y con permisos para poder desplegar aplicaciones.
-Asumimos que el cliente oc esta instalado en el host bastión
+Para el funcionamiento de velero es neceario tener el cliente de Openshift `oc` correctamente funcionando y acceso de cluster-admin para poder desplegar el software. 
+
+Asumimos que el cliente oc esta instalado en el host bastión sino puede descargarlo de [aquí](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz)
 
 ### 1. Clonar repositorio
 
@@ -57,7 +59,7 @@ sudo firewall-cmd --get-active-zones
 sudo firewall-cmd --zone=public --add-port=9000/tcp --permanent
 ```
 
-Levantar minio como contanedore en podman
+Levantar minio como contenedor con podman
 
 ```
 sudo podman run --name minio -p 9000:9000 \
@@ -72,7 +74,7 @@ Datos de conexión para el bastión en mi laboratorio.
 
 ```
 Bastion IP: 192.168.3.2
-Bastion Hostname: minio.mask.io
+Bastion Hostname: minio.semperti.local
 ```
 
 ### 3. Instalar el cliente de MinIO
@@ -87,7 +89,7 @@ mc --help
 Configuramos el bucket de velero
 
 ```
-mc alias set minio http://minio.mask.io:9000 MINIOKEYMINIO MINIOSECRETKEYMINIO
+mc alias set minio http://minio.semperti.local:9000 MINIOKEYMINIO MINIOSECRETKEYMINIO
 mc alias ls
 mc mb minio/velero
 ```
@@ -115,7 +117,7 @@ EOF
 
 ### 6. Instalacion de Velero
 
-Para la instalación de Velero tenemos basicamente dos opciones para poder instalarlo con o sin soporte de `restic`. `Restic` es una herramienta de backup nativa de linux y nos permite poder trabajar con volumenes persistentes, en este caso tenemos la opción de instalación con restic o sin el, solamente agregando el argumento `--restic`.
+En la instalación de velero tenemos dos opciones: con o sin soporte de `restic`. `Restic` es una herramienta de backup nativa de linux y nos permite poder trabajar con volumenes persistentes, en este caso tenemos la opción de instalación con restic o sin el, solamente agregando el argumento `--restic`.
 
 *ELEGIR SOLO UNA OPCION* 
 
@@ -156,13 +158,13 @@ velero install \
     --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.mask.io:9000
 ```
 
-*NOTA!!! Nota en caso de usar `restic`, hay que dar al service account permisos privilegiados para que funcione.* 
+*NOTA!!! Restic necesita acceder a los volúmenes asociados a los pods, es por esto que debemos otorgar premisos con privilegios.
 
 ```
 oc adm policy add-scc-to-user privileged -z velero -n velero
 ```
 
-Para el caso de `restic` hay que hacer el patch del daemonset (ds) para OCP u OKD mayor a 4.1
+En el caso de utilizar `restic` para versiones de Openshift u OKD 4.1+ debemos realizar el patch en el `DaemonSet` (ds) para que el pod con un `SecurityContextContrain` privilegiado.
 
 ```
 # Patch ds para okd u ocp mayor 4.1
@@ -172,7 +174,7 @@ oc patch ds/restic \
   -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
 ```
 
-En caso de que se desee que los pods de velero y restic corran en nodos dedicados podemos agregar el selector de nodo al namespace.
+En caso que se desee que los pods de velero y restic corran en nodos dedicados podemos agregar el selector de nodo al namespace.
 
 ```
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
@@ -188,14 +190,14 @@ for i in $(seq 1 10); do oc create configmap cm-$i --from-literal="key=$i"; done
 oc get configmap
 ```
 
-Segundo vamos a desplegar una aplicación complenta desde template.
+Segundo vamos a desplegar una aplicación completa desde template efimero de Openshit.
 
 ```
 oc new-project test-velero-2
 oc new-app django-psql-example
 ```
 
-Segundo vamos a desplegar una aplicación complenta desde template.
+Tercero vamos a desplegar una aplicación completa desde template con persistencia de datos.
 
 ```
 oc new-project test-velero-3
@@ -206,7 +208,7 @@ oc new-app django-psql-persistent
 
 Para realizar el backup con Velero solamente ejecutamos los siguientes comandos. 
 
-NOTA: En ambientes de multiple cluster donde tenemos un solo repositorio de velero es importante llamar a los backups por el nombre correcto.
+NOTA: En ambientes de múltiple cluster donde tenemos un solo repositorio de velero es importante llamar a los backups con la nomenclatura correcta. 
 
 ```bash
 BKP_DATE=$(date +'%Y%m%d-%H%M%S')
@@ -344,9 +346,9 @@ $
 
 En caso de querer hacer un backup en la nube y un restore en On Premise es super simple, tenemos dos alternativas.
 
-1. Backup minio en nube y minio on premise
+* **1. Backup MinIO en cloud y MinIO on premise**
 
-Para esto debemos copiar el backup de un s3 a otro s3 con minio hacemos lo siguiente, en el minio onpremise configurar el alias del minio de la nube.
+Para esto debemos copiar el backup de un s3 a otro s3. Desde la cli de MinIO, hacemos lo siguiente. En MinIO On-Premise configurar el alias del minio de la nube.
 
 ```
 $ mc alias ls | grep minio -A5 
@@ -372,7 +374,7 @@ mc cp --recursive minio-aws/velero/backups/aws-test-velero-2-20200905-131513 min
 mc ls minio/velero/backups/
 ```
 
-Realizamos el restore
+Realizamos el restore en On-Premise previamente los logueamos al cluster On-Premise, como nuestro despliegue de velero On-Premise tiene configurado el repo de MinIO y nosotros hicimos el restore sobre ese mismo bucket, vamos a ver los backup de la nube previamente copidos. Solo resta realizar el restore en el cluster porque la fuente esta en nuestro backend MinIO.
 
 ```
 $ oc get backups -n velero
@@ -390,9 +392,9 @@ Chequeamos el restore
 oc get cm -n test-velero-1
 ```
 
-2. Minio central para velero de la nube como para on premise
+* **2. Minio central para velero de la nube como para on premise**
 
-En este caso los backups que tomemos en la nube se verán en el minio de on premise, siempre es necesario que coloquemos los nombres correctos para no pisarlos.
+En este caso los backups que tomemos en la nube se verán en MinIO On Premise, es recomendable usar una nomenclatura a fin de distinguir cual es el origen de los backups, en nuestro caso utilizamos el prefijo `aws-velero-xxxx` para nombrar a los backups de AWS.
 
 ```
 velero restore create --from-backup aws-test-velero-1-20200905-131513
@@ -401,7 +403,7 @@ velero restore create --from-backup aws-test-velero-1-20200905-131513
 
 ### 13. Conclusiones y pasos a seguir.
 
-Queda por agregar varios de los test básicos que luego voy a ir agregando en pasos subsiguientes.
+Velero nos ofrece una opción rápida y simple para una estrategía de backup y retore nativa de Openshift/Kubernetes. Para ambientes de Cloud y/o ambientes OnPremise donde contemos backend de storage de tipo Cloud, es una excelente opcion para reforzar la estrategia de backup, restore o migración de aplicaciones. Quedan por ver para proximas entradas los puntos relacionados con: 
 
 1. Backups y Restore de Persistent Volumes con Snapshots
 2. Backups y Restore de Persistent Volumes con Restic
@@ -412,8 +414,8 @@ En las commit subsiguientes vamos a extender en conceptos teóricos y prácticos
 
 Los procedimientos son los mismos pero en este caso en formato shell scripts no mark down.
 
-* [Instalación en Openshift con MinIO en Openshift](velero-install.sh)
-* [Instalación en Openshfit con MinIO en host Bastión](velero-install.sh)
+* [Instalación en Openshift con MinIO en Openshift](https://github.com/gonzaloacosta/openshift-velero/blob/master/velero-install.sh)
+* [Instalación en Openshfit con MinIO en host Bastión](https://github.com/gonzaloacosta/openshift-velero/blob/master/velero-minio.sh)
 
 ## Links 
 
