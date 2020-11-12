@@ -247,9 +247,9 @@ velero backup describe test-velero-1-$BKP_DATE
 velero backup logs test-velero-2-$BKP_DATE
 ```
 
-### 10. Simulamos un eleminación de datos.
+### 10. Simulamos eliminación de datos.
 
-Borramos los configmaps del proyecto test-velero-1
+Borramos los configmaps del proyecto test-velero-1 que habíamos creado anteriorment.
 
 ```
 $ oc delete cm --all -n test-velero-1
@@ -269,7 +269,9 @@ No resources found in test-velero-1 namespace.
 
 ### 11. Restore con Velero
 
-1. Restore con velero de objetos de Kubernetes
+**1. Restore con velero de objetos de Kubernetes**
+
+Una vez eliminados los resturamos con el backup tomado previamente.
 
 ```
 $ velero restore create --from-backup test-velero-1-$BKP_DATE
@@ -277,7 +279,7 @@ Restore request "test-velero-1-20200904-183749-20200904184145" submitted success
 Run `velero restore describe test-velero-1-20200904-183749-20200904184145` or `velero restore logs test-velero-1-20200904-183749-20200904184145` for more details.
 ```
 
-Revisamos configmaps
+Revisamos configmaps y estan creados nuevamente.
 
 ```
 $ oc get cm -n test-velero-1
@@ -294,7 +296,7 @@ cm-8    1      18s
 cm-9    1      18s
 ```
 
-2. Restore con velero de un proyecto completo.
+**2. Restore con velero de un proyecto completo.**
 
 Borramos el proyecto completo
 
@@ -311,7 +313,7 @@ project.project.openshift.io "test-velero-2" deleted
 $
 ```
 
-Hacemos el restore completo.
+Hacemos el restore completo del proyecto borrado anteriormente.
 
 ```
 velero restore create --from-backup test-velero-2-$BKP_DATE
