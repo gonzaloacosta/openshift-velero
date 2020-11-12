@@ -424,8 +424,8 @@ En las commit subsiguientes vamos a extender en conceptos teóricos y prácticos
 
 Los procedimientos son los mismos pero en este caso en formato shell scripts no mark down.
 
-* [Instalación en Openshift con MinIO en Openshift](https://github.com/gonzaloacosta/openshift-velero/blob/master/velero-install.sh)
-* [Instalación en Openshfit con MinIO en host Bastión](https://github.com/gonzaloacosta/openshift-velero/blob/master/velero-minio.sh)
+* [Instalación en Openshift con MinIO en Openshift](velero-install.sh)
+* [Instalación en Openshfit con MinIO en host Bastión](velero-minio.sh)
 
 ## Links 
 
