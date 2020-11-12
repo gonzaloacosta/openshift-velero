@@ -400,6 +400,8 @@ Chequeamos el restore
 oc get cm -n test-velero-1
 ```
 
+Si bien el sentido fue desde el cluster de AWS al cluster On-Premise, tranquilamente la misma operatoria puede darse en sentido contrario.
+
 * **2. Minio central para velero de la nube como para on premise**
 
 En este caso los backups que tomemos en la nube se verán en MinIO On Premise, es recomendable usar una nomenclatura a fin de distinguir cual es el origen de los backups, en nuestro caso utilizamos el prefijo `aws-velero-xxxx` para nombrar a los backups de AWS.
